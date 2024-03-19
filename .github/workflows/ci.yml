@@ -1,0 +1,81 @@
+name: Build buildroot
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "format %y.%-m.$i or auto"
+        required: false
+        type: string
+      prerelease:
+        description: "pre release"
+        default: false
+        type: boolean
+      br2ver:
+        description: "buildroot version"
+        default: "2023.08.x"
+        type: string
+  push:
+
+jobs:
+  buildroot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@main
+
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          swap-storage: false
+
+      - name: Initialization environment
+        run: |
+          git config --global user.email "toshiki@asu.edu"
+          git config --global user.name "andatoshiki"
+          sudo timedatectl set-timezone "US/Arizona"
+
+          sudo apt update
+          sudo apt install -y jq gawk cpio gettext libelf-dev qemu-utils 
+          sudo snap install yq
+          
+          df -h
+
+      - name: Build buildroot
+        run: |
+          chmod +x ./build_shiki.sh
+          . ./build_shiki.sh "${{ inputs.br2ver}}"
+
+          [ -n "${BUILDROOT_VERSION}" ] && echo "BUILDROOT_VERSION=${BUILDROOT_VERSION}" >> $GITHUB_ENV || exit 1
+          [ -n "${KERNEL_VERSION}" ] && echo "KERNEL_VERSION=${KERNEL_VERSION}" >> $GITHUB_ENV || exit 1
+
+      - name: Zip modules
+        run: |
+          cp -f .shiki-buildroot/output/images/bzImage bzImage-shiki || exit 1
+          cp -f .shiki-buildroot/output/images/rootfs.cpio.xz initrd-shiki || exit 1
+
+          VERSION="${{ env.VERSION }}"
+          VERSION="${VERSION:-"test"}"
+
+          echo "${VERSION}" > "VERSION"
+          zip -9 ${{ github.workspace }}/buildroot-${VERSION}.zip -j bzImage-shiki initrd-shiki VERSION
+
+      - name: Upload artifact
+        if: env.VERSION == ''
+        uses: actions/upload-artifact@v3
+        with:
+          name: buildroot
+          path: |
+            buildroot*.zip 
+          retention-days: 5
+
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ inputs.version }}
+          files: |
+            .shiki-buildroot/output/images/bzImage
+            .shiki-buildroot/output/images/rootfs.cpio.xz
+          body: |
+            Buildroot version: ${{ env.BUILDROOT_VERSION }}
+            Kernel version: ${{ env.KERNEL_VERSION }}
