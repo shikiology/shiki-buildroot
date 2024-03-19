@@ -24,7 +24,7 @@ else
   popd
 fi
 
-cp -Ru ../shiki/* ./
+cp -Ru ../* ./
 echo "Generating default config"
 make BR2_EXTERNAL=./external -j$(nproc) shiki_defconfig
 
