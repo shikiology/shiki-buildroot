@@ -1,0 +1,10 @@
+config BR2_PACKAGE_R8126
+	bool "r8126"
+	depends on BR2_LINUX_KERNEL
+	help
+	  A standalone driver for the RTL8126 Ethernet adapter.
+
+	  https://github.com/shikiology/r8126
+
+comment "r8126 needs a Linux kernel to be built"
+	depends on !BR2_LINUX_KERNEL
